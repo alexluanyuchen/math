@@ -1,0 +1,352 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MathGenius AI</title>
+<style>
+*{box-sizing:border-box}
+body{
+ margin:0;background:#0b1020;color:#eef4ff;
+ font-family:Arial,"Microsoft YaHei",sans-serif;
+ padding:20px
+}
+.app{max-width:1000px;margin:auto}
+header{text-align:center;padding:20px}
+header h1{font-size:32px;color:#79b7ff;margin:5px}
+header p{color:#91a4c4}
+.panel{
+ background:#151f34;border:1px solid #30405f;
+ border-radius:17px;padding:20px;margin-bottom:18px
+}
+h3{margin-top:0}
+label{display:block;color:#aebed8;font-size:13px;margin:15px 0 8px}
+input,select{
+ width:100%;padding:13px;border-radius:9px;
+ border:1px solid #405477;background:#0c1425;
+ color:white;font-size:15px
+}
+button{
+ border:0;border-radius:9px;padding:12px 16px;
+ cursor:pointer;font-weight:bold
+}
+.levels{display:flex;gap:8px}
+.levels button{
+ flex:1;background:#263550;color:#fff
+}
+.levels button.active{background:#397fe4}
+.generate{
+ width:100%;margin-top:20px;
+ background:linear-gradient(90deg,#70aaff,#65e0ed);
+ color:#071326
+}
+.question{
+ font-size:23px;line-height:1.7;
+ margin:25px 0;white-space:pre-line
+}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.row input{flex:1;min-width:150px}
+.submit{background:#397fe4;color:white}
+.next{background:#169c76;color:white}
+.feedback{
+ display:none;margin-top:18px;padding:16px;
+ border-radius:12px;white-space:pre-line;line-height:1.8
+}
+.good{display:block;background:#103b2d;color:#a9f4d4}
+.bad{display:block;background:#3b1c29;color:#ffc0ca}
+.stats{
+ display:grid;grid-template-columns:repeat(3,1fr);gap:10px
+}
+.stat{
+ background:#0c1425;padding:15px;border-radius:11px;
+ text-align:center;color:#9aabc6
+}
+.stat strong{display:block;color:white;font-size:25px;margin-top:7px}
+.history-item{
+ padding:10px;background:#0c1425;border-radius:8px;
+ margin-top:8px;font-size:13px;color:#b8c8df
+}
+@media(max-width:550px){
+ .levels{display:grid;grid-template-columns:repeat(2,1fr)}
+ .question{font-size:19px}
+ .row{flex-direction:column}
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+<header>
+<h1>∑ MathGenius AI</h1>
+<p>智能数学训练 · 自动出题 · 即时判分</p>
+</header>
+
+<div class="panel">
+<h3>⚙ 训练设置</h3>
+
+<label>数学题类型</label>
+<input id="topic" placeholder="例如：方程、几何、函数、概率、数列">
+
+<label>学习阶段</label>
+<select id="stage">
+<option>小学</option>
+<option selected>初中</option>
+<option>高中</option>
+<option>大学</option>
+</select>
+
+<label>题目难度</label>
+<div class="levels">
+<button class="active" onclick="setLevel('简单',this)">简单</button>
+<button onclick="setLevel('中等',this)">中等</button>
+<button onclick="setLevel('困难',this)">困难</button>
+<button onclick="setLevel('专家',this)">专家</button>
+</div>
+
+<button class="generate" onclick="generate()">✦ 生成数学题</button>
+</div>
+
+<div class="panel">
+<h3>📊 学习成绩</h3>
+<div class="stats">
+<div class="stat">总答题数<strong id="total">0</strong></div>
+<div class="stat">正确题数<strong id="correct">0</strong></div>
+<div class="stat">正确率<strong id="rate">0%</strong></div>
+</div>
+</div>
+
+<div class="panel">
+<h3>🧠 数学挑战</h3>
+<div id="question" class="question">
+欢迎使用 MathGenius AI！
+请先选择题型、阶段和难度。
+</div>
+
+<label>你的答案</label>
+<div class="row">
+<input id="answer" placeholder="输入你的答案">
+<button class="submit" onclick="checkAnswer()">提交答案</button>
+<button class="next" onclick="generate()">下一题</button>
+</div>
+
+<div id="feedback" class="feedback"></div>
+</div>
+
+<div class="panel">
+<h3>📚 最近答题记录</h3>
+<div id="history">暂无答题记录</div>
+</div>
+
+</div>
+
+<script>
+let difficulty="简单";
+let answer=null;
+let explanation="";
+let total=0,correct=0;
+let finished=false;
+let records=[];
+
+function setLevel(v,btn){
+ difficulty=v;
+ document.querySelectorAll(".levels button")
+ .forEach(b=>b.classList.remove("active"));
+ btn.classList.add("active");
+}
+
+function random(a,b){
+ return Math.floor(Math.random()*(b-a+1))+a;
+}
+
+function pick(a){return a[random(0,a.length-1)]}
+
+function showQuestion(text,type){
+ document.getElementById("question").textContent=
+ document.getElementById("stage").value+" · "+
+ difficulty+" · "+type+"\n\n"+text;
+}
+
+function generate(){
+ finished=false;
+ answer=null;
+ let topic=document.getElementById("topic").value.trim().toLowerCase();
+ let stage=document.getElementById("stage").value;
+ let d={简单:1,中等:2,困难:3,专家:4}[difficulty];
+
+ let type=topic;
+
+ if(!type){
+ let options={
+ "小学":["四则运算","百分数","几何"],
+ "初中":["方程","几何","百分数","勾股定理"],
+ "高中":["函数","方程","数列","概率"],
+ "大学":["导数","积分","概率","函数"]
+ };
+ type=pick(options[stage]);
+ }
+
+ // 不让低年级出现超阶段题型
+ if(stage==="小学" && ["导数","积分","数列","函数","概率","方程","勾股定理"].some(x=>type.includes(x))){
+ type="四则运算";
+ }
+ if(stage==="初中" && ["导数","积分"].some(x=>type.includes(x))){
+ type="方程";
+ }
+ if(stage==="高中" && ["导数","积分"].some(x=>type.includes(x))){
+ type="函数";
+ }
+
+ let a,b,x,n,c;
+
+ if(type.includes("方程")){
+ x=random(-8,12);
+ a=random(2,5*d);
+ b=random(-10,15);
+ let rhs=a*x+b;
+ answer=x;
+ explanation=`移项：${a}x = ${rhs-b}\n所以 x = ${x}`;
+ showQuestion(`解方程：${a}x + (${b}) = ${rhs}，求 x。`,type);
+ }
+
+ else if(type.includes("几何")||type.includes("面积")){
+ a=random(3,8*d);
+ b=random(3,9*d);
+ answer=a*b;
+ explanation=`长方形面积 = 长 × 宽\n${a} × ${b} = ${answer}`;
+ showQuestion(`长方形长 ${a} cm，宽 ${b} cm，求面积。`,type);
+ }
+
+ else if(type.includes("勾股")){
+ let t=pick([[3,4,5],[5,12,13],[8,15,17],[7,24,25]]);
+ answer=t[2];
+ explanation=`勾股定理：c²=a²+b²\n${t[0]}² + ${t[1]}² = ${answer}²`;
+ showQuestion(`直角三角形两条直角边分别为 ${t[0]} 和 ${t[1]}，求斜边。`,type);
+ }
+
+ else if(type.includes("百分")){
+ a=random(40,200)*d;
+ b=pick([10,20,25,30,40,50]);
+ answer=Number((a*(1-b/100)).toFixed(2));
+ explanation=`降价金额：${a} × ${b}% = ${a*b/100}\n现价：${a} - ${a*b/100} = ${answer}`;
+ showQuestion(`商品原价 ${a} 元，降价 ${b}%，现价是多少元？`,type);
+ }
+
+ else if(type.includes("函数")){
+ a=random(2,5*d);
+ b=random(-8,10);
+ x=random(-4,6);
+ answer=a*x+b;
+ explanation=`将 x=${x} 代入：\nf(${x})=${a}×${x}+(${b})=${answer}`;
+ showQuestion(`已知 f(x)=${a}x+(${b})，求 f(${x})。`,type);
+ }
+
+ else if(type.includes("数列")){
+ a=random(1,10);
+ b=random(2,5*d);
+ n=random(5,10);
+ answer=a+(n-1)*b;
+ explanation=`等差数列通项公式：\naₙ=a₁+(n-1)d\n=${a}+(${n}-1)×${b}=${answer}`;
+ showQuestion(`等差数列首项为 ${a}，公差为 ${b}，求第 ${n} 项。`,type);
+ }
+
+ else if(type.includes("概率")){
+ a=random(2,8);
+ b=random(2,8);
+ answer=Number((a/(a+b)).toFixed(4));
+ explanation=`概率=有利情况数÷总情况数\n${a}÷(${a}+${b})=${answer}`;
+ showQuestion(`袋中有 ${a} 个红球和 ${b} 个蓝球，随机取一个，取到红球的概率是多少？（小数）`,type);
+ }
+
+ else if(type.includes("导数")){
+ n=random(2,5);
+ x=random(1,4);
+ answer=n*Math.pow(x,n-1);
+ explanation=`幂函数求导：\n(xⁿ)'=nxⁿ⁻¹\n=${n}×${x}^${n-1}=${answer}`;
+ showQuestion(`f(x)=x^${n}，求 f'(${x})。`,type);
+ }
+
+ else if(type.includes("积分")){
+ a=random(1,5);
+ b=random(2,4);
+ answer=a*b*b/2;
+ explanation=`原函数：${a/2}x²\n代入上下限：${a/2}×${b}²=${answer}`;
+ showQuestion(`计算定积分：∫₀^${b} ${a}x dx。`,type);
+ }
+
+ else{
+ a=random(2,20*d);
+ b=random(2,15*d);
+ c=random(2,5);
+ answer=a+b*c;
+ explanation=`先乘法：${b}×${c}=${b*c}\n再加法：${a}+${b*c}=${answer}`;
+ showQuestion(`计算：${a} + ${b} × ${c} = ?`,"四则运算");
+ }
+
+ document.getElementById("answer").value="";
+ document.getElementById("feedback").className="feedback";
+ document.getElementById("feedback").textContent="";
+}
+
+function checkAnswer(){
+ if(answer===null){
+ alert("请先生成题目！");
+ return;
+ }
+ if(finished)return;
+
+ let value=document.getElementById("answer").value.trim();
+ if(!value){alert("请输入答案！");return}
+
+ let num;
+ if(/^[-+]?\d+\/[-+]?\d+$/.test(value)){
+ let p=value.split("/").map(Number);
+ if(p[1]===0){alert("分母不能为零");return}
+ num=p[0]/p[1];
+ }else num=Number(value);
+
+ if(!Number.isFinite(num)){
+ alert("请输入有效数字！");
+ return;
+ }
+
+ let ok=Math.abs(num-answer)<0.0001;
+ finished=true;
+ total++;
+ if(ok)correct++;
+
+ document.getElementById("total").textContent=total;
+ document.getElementById("correct").textContent=correct;
+ document.getElementById("rate").textContent=
+ Math.round(correct/total*100)+"%";
+
+ let feedback=document.getElementById("feedback");
+ feedback.className="feedback "+(ok?"good":"bad");
+
+ feedback.textContent=
+ (ok?"✓ 恭喜你，过！":"✕ 很遗憾，不通过！")+
+ "\n\n正确答案："+answer+
+ "\n\n解题解析：\n"+explanation;
+
+ records.unshift({
+ text:document.getElementById("question").textContent.split("\n\n")[1],
+ ok:ok
+ });
+ records=records.slice(0,8);
+ renderHistory();
+}
+
+function renderHistory(){
+ let box=document.getElementById("history");
+ box.innerHTML="";
+ records.forEach(r=>{
+ let item=document.createElement("div");
+ item.className="history-item";
+ item.textContent=(r.ok?"✓ 通过 · ":"✕ 未通过 · ")+r.text;
+ box.appendChild(item);
+ });
+ if(records.length===0)box.textContent="暂无答题记录";
+}
+</script>
+</body>
+</html>
